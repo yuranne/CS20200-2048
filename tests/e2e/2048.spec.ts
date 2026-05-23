@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 
 const board = (page) => page.locator(".board");
-const boardShell = (page) => page.locator(".board-shell");
 
 test("renders the playable board without overflow", async ({ page }, testInfo) => {
   await page.goto("/");
@@ -16,16 +15,30 @@ test("renders the playable board without overflow", async ({ page }, testInfo) =
   expect(box!.width).toBeLessThanOrEqual(testInfo.project.use.viewport?.width ?? 1440);
 });
 
-test("moves with keyboard and can submit a ranked score", async ({ page }) => {
+test("moves with keyboard without focusing the board and can submit a ranked score", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name.includes("mobile"), "Mobile play is covered by swipe input.");
+
   await page.goto("/");
-  await boardShell(page).focus();
+  await expect(page.getByRole("button", { name: "Submit" }).first()).toBeDisabled();
+  await page.locator("body").click({ position: { x: 12, y: 12 } });
 
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("ArrowUp");
-  await expect(board(page).locator(".tile-value").first()).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("button", { name: "Submit" }).first()).toBeEnabled();
 
   await page.getByRole("button", { name: "Submit" }).first().click();
   await expect(page.locator(".notice")).toContainText(/Submitted|Submitting|Ranked|session|points/i);
+});
+
+test("does not move the board while typing in form controls", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByLabel("Nickname").fill("ArrowTester");
+  await page.keyboard.press("ArrowLeft");
+
+  await expect(page.getByRole("button", { name: "Submit" }).first()).toBeDisabled();
 });
 
 test("supports mobile swipe input", async ({ page }) => {

@@ -32,6 +32,7 @@ type GameModel =
     { State: GameState
       History: GameState list
       Session: GameSessionDto option
+      RankedRequestId: int
       StartedAtMs: int
       FinishedRecorded: bool }
 
@@ -57,8 +58,8 @@ type Model =
 
 type Msg =
     | StartNewGame
-    | RankedGameStarted of GameSessionDto
-    | RankedGameFailed of exn
+    | RankedGameStarted of int * GameSessionDto
+    | RankedGameFailed of int * exn
     | MoveRequested of Direction
     | UndoRequested
     | SubmitScore
@@ -87,6 +88,9 @@ let private themeStorageKey = "cs20200-2048-theme"
 
 [<Emit("Date.now()")>]
 let private dateNow () : float = jsNative
+
+[<Emit("!!(document.activeElement && (document.activeElement.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)))")>]
+let private activeElementAcceptsText () : bool = jsNative
 
 let private nowMs () =
     int (dateNow ())
@@ -171,10 +175,11 @@ let private loadTheme () =
 let private saveTheme theme =
     window.localStorage.setItem(themeStorageKey, themeKey theme)
 
-let private newGameModel (settings: GameSettings) seed session =
+let private newGameModel (settings: GameSettings) seed session requestId =
     { State = newGame settings seed
       History = []
       Session = session
+      RankedRequestId = requestId
       StartedAtMs = nowMs ()
       FinishedRecorded = false }
 
@@ -187,14 +192,18 @@ let private leaderboardCmd (settings: GameSettings) =
         LeaderboardLoaded
         LeaderboardFailed
 
-let private startRankedCmd (settings: GameSettings) =
-    Cmd.OfAsync.either api.startRankedGame settings RankedGameStarted RankedGameFailed
+let private startRankedCmd requestId (settings: GameSettings) =
+    Cmd.OfAsync.either
+        api.startRankedGame
+        settings
+        (fun session -> RankedGameStarted(requestId, session))
+        (fun error -> RankedGameFailed(requestId, error))
 
 let init () =
     let settings = defaultSettings
 
     let model =
-        { Game = newGameModel settings (localSeed ()) None
+        { Game = newGameModel settings (localSeed ()) None 0
           Leaderboard =
             { Entries = []
               Loading = true
@@ -209,7 +218,7 @@ let init () =
               PointerStart = None
               ShareText = None } }
 
-    model, Cmd.batch [ startRankedCmd settings; leaderboardCmd settings ]
+    model, Cmd.batch [ startRankedCmd model.Game.RankedRequestId settings; leaderboardCmd settings ]
 
 let private recordFinishedGame (model: Model) =
     if model.Game.FinishedRecorded || model.Game.State.Status = Playing then
@@ -245,6 +254,27 @@ let private directionFromKey key =
     | "D" -> Some Right
     | _ -> None
 
+let private keyboardSubscription (_: Model) : Sub<Msg> =
+    let subscribe dispatch =
+        let handler =
+            fun (event: Event) ->
+                let keyboardEvent = event :?> KeyboardEvent
+
+                if not (activeElementAcceptsText ()) then
+                    match directionFromKey keyboardEvent.key with
+                    | Some direction ->
+                        keyboardEvent.preventDefault()
+                        dispatch (MoveRequested direction)
+                    | None -> ()
+
+        window.addEventListener ("keydown", handler)
+
+        { new IDisposable with
+            member _.Dispose() =
+                window.removeEventListener ("keydown", handler) }
+
+    [ [ "keyboard" ], subscribe ]
+
 let private directionFromSwipe ((startX, startY): float * float) ((endX, endY): float * float) =
     let dx = endX - startX
     let dy = endY - startY
@@ -277,10 +307,11 @@ let update msg model =
     match msg with
     | StartNewGame ->
         let settings = normalizeSettings model.DraftSettings
+        let requestId = model.Game.RankedRequestId + 1
 
         let model' =
             { model with
-                Game = newGameModel settings (localSeed ()) None
+                Game = newGameModel settings (localSeed ()) None requestId
                 DraftSettings = settings
                 Leaderboard =
                     { model.Leaderboard with
@@ -289,25 +320,36 @@ let update msg model =
                         SubmitStatus = None }
                 Ui = { model.Ui with ShareText = None } }
 
-        model', Cmd.batch [ startRankedCmd settings; leaderboardCmd settings ]
+        model', Cmd.batch [ startRankedCmd requestId settings; leaderboardCmd settings ]
 
-    | RankedGameStarted session ->
-        let model' =
+    | RankedGameStarted(requestId, session) ->
+        if requestId <> model.Game.RankedRequestId then
+            model, Cmd.none
+        elif model.Game.State.Moves.IsEmpty && model.Game.Session.IsNone then
+            let model' =
+                { model with
+                    Game = newGameModel session.Settings session.Seed (Some session) requestId
+                    Leaderboard =
+                        { model.Leaderboard with
+                            SubmitStatus = Some "Ranked session ready." } }
+
+            model', Cmd.none
+        else
             { model with
-                Game = newGameModel session.Settings session.Seed (Some session)
-                DraftSettings = session.Settings
                 Leaderboard =
                     { model.Leaderboard with
-                        SubmitStatus = Some "Ranked session ready." } }
+                        SubmitStatus = Some "Ranked session is ready for the next new game." } },
+            Cmd.none
 
-        model', Cmd.none
-
-    | RankedGameFailed error ->
-        { model with
-            Leaderboard =
-                { model.Leaderboard with
-                    SubmitStatus = Some(sprintf "Ranked mode unavailable: %s" error.Message) } },
-        Cmd.none
+    | RankedGameFailed(requestId, error) ->
+        if requestId <> model.Game.RankedRequestId then
+            model, Cmd.none
+        else
+            { model with
+                Leaderboard =
+                    { model.Leaderboard with
+                        SubmitStatus = Some(sprintf "Ranked mode unavailable: %s" error.Message) } },
+            Cmd.none
 
     | MoveRequested direction ->
         let outcome, state' = applyMove model.Game.State direction
@@ -480,12 +522,6 @@ let private boardView model dispatch =
         prop.className "board-shell"
         prop.tabIndex 0
         prop.autoFocus true
-        prop.onKeyDown (fun (event: KeyboardEvent) ->
-            match directionFromKey event.key with
-            | Some direction ->
-                event.preventDefault()
-                dispatch (MoveRequested direction)
-            | None -> ())
         prop.children [
             Html.div [
                 prop.className (sprintf "board board-size-%i" size)
@@ -751,5 +787,6 @@ let view model dispatch =
     ]
 
 Program.mkProgram init update view
+|> Program.withSubscription keyboardSubscription
 |> Program.withReactSynchronous "root"
 |> Program.run
