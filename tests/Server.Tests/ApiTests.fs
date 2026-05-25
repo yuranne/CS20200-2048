@@ -105,6 +105,37 @@ type ApiTests() =
         |> Async.RunSynchronously
 
     [<TestMethod>]
+    member _.``score submission matches shared replay with typed tile rules``() =
+        async {
+            let store, path = createStore ()
+
+            try
+                let api = Api.createGameApi store
+                let! session = api.startRankedGame defaultSettings
+                let moves = [ Left; Up; Right; Down; Left; Up; Left; Down ]
+                let replayed = replay session.Settings session.Seed moves
+
+                let submission =
+                    { SessionId = session.SessionId
+                      Nickname = "Replay"
+                      Moves = moves
+                      DurationMs = 21000
+                      UsedUndo = false }
+
+                let! result = api.submitScore submission
+
+                match result with
+                | Ok entry ->
+                    Assert.AreEqual<int>(replayed.Score, entry.Score)
+                    Assert.AreEqual<int>(maxTile replayed.Board, entry.MaxTile)
+                    Assert.AreEqual<int>(replayed.Moves.Length, entry.MoveCount)
+                | Error message -> Assert.Fail(message)
+            finally
+                cleanup path
+        }
+        |> Async.RunSynchronously
+
+    [<TestMethod>]
     member _.``leaderboard ordering uses score max tile moves and duration``() =
         let store, path = createStore ()
 

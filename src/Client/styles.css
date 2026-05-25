@@ -256,6 +256,20 @@ h2 {
   animation: tile-pop 130ms ease-out;
 }
 
+.tile-cubic {
+  background: #7a4aa0;
+  color: #fffaf1;
+  border: 2px solid color-mix(in srgb, #fffaf1, transparent 52%);
+  font-size: clamp(0.88rem, 4.7vw, 1.9rem);
+}
+
+.tile-joker {
+  background: #111827;
+  color: #facc15;
+  border: 2px solid #facc15;
+  font-size: clamp(1.1rem, 6vw, 2.4rem);
+}
+
 .tile-2 {
   background: #eee4da;
   color: #352d24;

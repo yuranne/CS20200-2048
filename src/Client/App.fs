@@ -481,11 +481,12 @@ let update msg model =
     | ClearShare ->
         { model with Ui = { model.Ui with ShareText = None } }, Cmd.none
 
-let private tileClass value =
-    if value = 0 then
-        "tile tile-empty"
-    else
-        sprintf "tile tile-value tile-%i" value
+let private tileClass tile =
+    match tile with
+    | Empty -> "tile tile-empty"
+    | Normal value -> sprintf "tile tile-value tile-normal tile-%i" value
+    | Cubic value -> sprintf "tile tile-value tile-cubic tile-cubic-%i" value
+    | Joker -> "tile tile-value tile-joker"
 
 let private statusText status =
     match status with
@@ -536,7 +537,7 @@ let private boardView model dispatch =
                     for value in state.Board do
                         Html.div [
                             prop.className (tileClass value)
-                            prop.text (if value = 0 then "" else string value)
+                            prop.text (tileDisplay value)
                         ]
                 ]
             ]
