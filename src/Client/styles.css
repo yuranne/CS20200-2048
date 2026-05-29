@@ -272,50 +272,63 @@ h2 {
 
 .tile-2 {
   background: #eee4da;
-  color: #352d24;
+  color: #776e65;
 }
 
 .tile-4 {
-  background: #e3d2b8;
-  color: #352d24;
+  background: #ede0c8;
+  color: #776e65;
 }
 
 .tile-8 {
-  background: #d7794a;
+  background: #f2b179;
+  color: #f9f6f2;
 }
 
 .tile-16 {
-  background: #c95f3e;
+  background: #f59563;
+  color: #f9f6f2;
 }
 
 .tile-32 {
-  background: #b9483b;
+  background: #f67c5f;
+  color: #f9f6f2;
 }
 
 .tile-64 {
-  background: #9f3b35;
+  background: #f65e3b;
+  color: #f9f6f2;
 }
 
 .tile-128 {
-  background: #3f8f84;
+  background: #edcf72;
+  color: #f9f6f2;
 }
 
 .tile-256 {
-  background: #2d756f;
+  background: #edcc61;
+  color: #f9f6f2;
 }
 
 .tile-512 {
-  background: #345d9d;
+  background: #edc850;
+  color: #f9f6f2;
 }
 
 .tile-1024 {
-  background: #5c4f9e;
+  background: #edc53f;
+  color: #f9f6f2;
 }
 
-.tile-2048,
+.tile-2048 {
+  background: #edc22e;
+  color: #f9f6f2;
+}
+
 .tile-4096,
 .tile-8192 {
-  background: #1f2937;
+  background: #3c3a32;
+  color: #f9f6f2;
 }
 
 .status-panel,
