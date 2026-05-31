@@ -4,11 +4,8 @@ SAFE-style F# 2048 web service built with Fable, Elmish, Feliz, Vite, Tailwind, 
 
 ## Live demo
 
-Play the hosted version on Render:
-
-```text
-https://cs20200-2048.onrender.com/
-```
+### Play the hosted version on Render: [https://cs20200-2048.onrender.com/](https://cs20200-2048.onrender.com/)
+<br />
 
 ## Requirements
 
